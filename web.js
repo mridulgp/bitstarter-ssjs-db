@@ -1,111 +1,103 @@
-// Define routes for simple SSJS web app. 
-// Writes Coinbase orders to database.
-var async   = require('async')
-  , express = require('express')
-  , fs      = require('fs')
-  , http    = require('http')
-  , https   = require('https')
-  , db      = require('./models');
-
-var app = express();
-app.set('views', __dirname + '/views');
-app.set('view engine', 'ejs');
-app.set('port', process.env.PORT || 8080);
-
-// Render homepage (note trailing slash): example.com/
-app.get('/', function(request, response) {
-  var data = fs.readFileSync('index.html').toString();
-  response.send(data);
-});
-
-// Render example.com/orders
-app.get('/orders', function(request, response) {
-  global.db.Order.findAll().success(function(orders) {
-    var orders_json = [];
-    orders.forEach(function(order) {
-      orders_json.push({id: order.coinbase_id, amount: order.amount, time: order.time});
-    });
-    // Uses views/orders.ejs
-    response.render("orders", {orders: orders_json});
-  }).error(function(err) {
-    console.log(err);
-    response.send("error retrieving orders");
-  });
-});
-
-// Hit this URL while on example.com/orders to refresh
-app.get('/refresh_orders', function(request, response) {
-  https.get("https://coinbase.com/api/v1/orders?api_key=" + process.env.COINBASE_API_KEY, function(res) {
-    var body = '';
-    res.on('data', function(chunk) {body += chunk;});
-    res.on('end', function() {
-      try {
-        var orders_json = JSON.parse(body);
-        if (orders_json.error) {
-          response.send(orders_json.error);
-          return;
-        }
-        // add each order asynchronously
-        async.forEach(orders_json.orders, addOrder, function(err) {
-          if (err) {
-            console.log(err);
-            response.send("error adding orders");
-          } else {
-            // orders added successfully
-            response.redirect("/orders");
-          }
-        });
-      } catch (error) {
-        console.log(error);
-        response.send("error parsing json");
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>My First Bitstarter</title>
+    <link type="text/css" rel="stylesheet" 
+          href="https://d396qusza40orc.cloudfront.net/startup%2Fcode%2Fbootstrap-2.3.2.css">
+    <style type="text/css">
+      body {
+        padding-top: 20px;
+        padding-bottom: 40px;
       }
-    });
-
-    res.on('error', function(e) {
-      console.log(e);
-      response.send("error syncing orders");
-    });
-  });
-
-});
-
-// sync the database and start the server
-db.sequelize.sync().complete(function(err) {
-  if (err) {
-    throw err;
-  } else {
-    http.createServer(app).listen(app.get('port'), function() {
-      console.log("Listening on " + app.get('port'));
-    });
-  }
-});
-
-// add order to the database if it doesn't already exist
-var addOrder = function(order_obj, callback) {
-  var order = order_obj.order; // order json from coinbase
-  if (order.status != "completed") {
-    // only add completed orders
-    callback();
-  } else {
-    var Order = global.db.Order;
-    // find if order has already been added to our database
-    Order.find({where: {coinbase_id: order.id}}).success(function(order_instance) {
-      if (order_instance) {
-        // order already exists, do nothing
-        callback();
-      } else {
-        // build instance and save
-          var new_order_instance = Order.build({
-          coinbase_id: order.id,
-          amount: order.total_btc.cents / 100000000, // convert satoshis to BTC
-          time: order.created_at
-        });
-          new_order_instance.save().success(function() {
-          callback();
-        }).error(function(err) {
-          callback(err);
-        });
+      .container {
+        width: 960px;
       }
-    });
-  }
-};
+      p.lead {
+        padding-top: 15px;
+      }
+      .navigation, .pitch, .section1, .section2, .faq, .footer {
+        padding: 10px 0px 10px 0px;
+      }
+      .video, .thermometer, .order, .social {
+        border: 1px dotted;
+        text-align: center;
+      }
+      .video {
+        /* Internal borders have 1px width, thus need to add 4 x 1px to 120px. */
+        height: 124px;
+        line-height: 124px;
+      }
+      .thermometer, .order, .social {
+        /* line-height to vertically center: http://phrogz.net/css/vertical-align/index.html */
+        height: 40px;
+        line-height: 40px;
+      }
+      div.row {
+        border: 1px solid;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="row navigation">
+        <div class="span2 logo">
+          Logo
+        </div>
+        <div class="span6 blank">
+          Blank
+        </div>
+        <div class="span4 about">
+          About
+        </div>
+      </div>
+      <div class="row heading">
+        <div class="span12">
+          <h1>Bitstarter Title</h1>
+        </div>
+      </div> 
+     <div class="row subheading">
+        <div class="span12">
+          <p class="lead">This is my first bitstarter project.</p>
+        </div>
+      </div>
+      <div class="row pitch">
+        <div class="span6 video">
+          Video
+        </div>
+        <div class="span6">
+          <div class="thermometer">
+            Thermometer
+          </div>
+          <div class="order">
+            Order
+          </div>
+          <div class="social">
+            Social
+          </div>
+        </div>
+      </div>
+      <div class="row section1">
+        <div class="span12">
+          Marketing Section 1
+        </div>
+      </div>
+      <div class="row section2">
+        <div class="span12">
+          Marketing Section 2
+        </div>
+      </div>
+      <div class="row faq">
+        <div class="span12">
+          FAQ
+        </div>
+      </div>
+      <div class="row footer">
+        <div class="span12">
+          Footer
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
+
